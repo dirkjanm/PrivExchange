@@ -182,7 +182,7 @@ def do_privexchange(host, attacker_url):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Exchange your privileges for Domain Admin privs by abusing Exchange. Use me with ntlmrelayx')
-    parser.add_argument("hosts", nargs='+', type=str, metavar='HOSTNAME', help="Hostname/ip of the Exchange server")
+    parser.add_argument("hosts", nargs='+', type=str, metavar='HOSTNAME', help="Hostname(s)/ip(s) of the Exchange server")
     parser.add_argument("-u", "--user", metavar='USERNAME', help="username for authentication")
     parser.add_argument("-d", "--domain", metavar='DOMAIN', help="domain the user is in (FQDN or NETBIOS domain name)")
     parser.add_argument("-t", "--timeout", default=10, type=int, metavar="TIMEOUT", help="HTTP(s) connection timeout (Default: 10 seconds)")
