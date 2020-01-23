@@ -1,6 +1,6 @@
 ####################
 #
-# Copyright (c) 2019 Dirk-jan Mollema
+# Copyright (c) 2020 Dirk-jan Mollema
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -21,7 +21,7 @@
 # SOFTWARE.
 #
 ####################
-
+from __future__ import unicode_literals
 import ssl
 import argparse
 import logging
@@ -31,7 +31,10 @@ import base64
 import re
 import binascii
 import xml.etree.ElementTree as ET
-from httplib import HTTPConnection, HTTPSConnection, ResponseNotReady
+try:
+    from http.client import HTTPConnection, HTTPSConnection, ResponseNotReady
+except ImportError:
+    from httplib import HTTPConnection, HTTPSConnection, ResponseNotReady
 from impacket import ntlm
 
 
@@ -130,7 +133,7 @@ def main():
     # Headers
     # Source: https://github.com/thezdi/PoC/blob/master/CVE-2018-8581/Exch_EWS_pushSubscribe.py
     headers = {
-        "Authorization": 'NTLM %s' % negotiate,
+        "Authorization": 'NTLM %s' % negotiate.decode('utf-8'),
         "Content-type": "text/xml; charset=utf-8",
         "Accept": "text/xml",
         "User-Agent": "ExchangeServicesClient/0.0.0.0",
@@ -176,7 +179,7 @@ def main():
     auth = base64.b64encode(ntlm_auth.getData())
 
     headers = {
-        "Authorization": 'NTLM %s' % auth,
+        "Authorization": 'NTLM %s' % auth.decode('utf-8'),
         "Content-type": "text/xml; charset=utf-8",
         "Accept": "text/xml",
         "User-Agent": "ExchangeServicesClient/0.0.0.0",
